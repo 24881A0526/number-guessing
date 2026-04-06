@@ -1,18 +1,1039 @@
-# This .gitignore is appropriate for repositories deployed to GitHub Pages and using
-# a Gemfile as specified at https://github.com/github/pages-gem#conventional
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guess the Number</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Outfit:wght@200;400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  /* ===== DESIGN TOKENS =====
+     A warm amber-on-dark palette — distinctive, not template-y */
+  :root {
+    --bg: #0c0a09;
+    --bg-subtle: #1c1917;
+    --card: #292524;
+    --card-hover: #33302e;
+    --border: #44403c;
+    --fg: #fafaf9;
+    --fg-dim: #a8a29e;
+    --muted: #78716c;
+    --accent: #f59e0b;
+    --accent-light: #fbbf24;
+    --accent-dim: rgba(245,158,11,0.12);
+    --accent-glow: rgba(245,158,11,0.25);
+    --danger: #ef4444;
+    --danger-dim: rgba(239,68,68,0.12);
+    --success: #22c55e;
+    --success-dim: rgba(34,197,94,0.12);
+    --info: #38bdf8;
+    --info-dim: rgba(56,189,248,0.12);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
 
-# Basic Jekyll gitignores (synchronize to Jekyll.gitignore)
-_site/
-.sass-cache/
-.jekyll-cache/
-.jekyll-metadata
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-# Additional Ruby/bundler ignore for when you run: bundle install
-/vendor
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
 
-# Specific ignore for GitHub Pages
-# GitHub Pages will always use its own deployed version of pages-gem 
-# This means GitHub Pages will NOT use your Gemfile.lock and therefore it is
-# counterproductive to check this file into the repository.
-# Details at https://github.com/github/pages-gem/issues/768
-Gemfile.lock
+  /* ===== ANIMATED BACKGROUND =====
+     Floating orbs + noise texture for depth */
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.3;
+    animation: orbDrift 25s ease-in-out infinite alternate;
+  }
+
+  .orb:nth-child(1) {
+    width: 500px; height: 500px;
+    background: #92400e;
+    top: -15%; left: -10%;
+  }
+
+  .orb:nth-child(2) {
+    width: 400px; height: 400px;
+    background: #b45309;
+    bottom: -10%; right: -8%;
+    animation-delay: -8s;
+    animation-direction: alternate-reverse;
+  }
+
+  .orb:nth-child(3) {
+    width: 300px; height: 300px;
+    background: #f59e0b;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.08;
+    animation-delay: -15s;
+  }
+
+  @keyframes orbDrift {
+    0% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(40px, -30px) scale(1.08); }
+    100% { transform: translate(-20px, 20px) scale(0.95); }
+  }
+
+  /* Subtle dot grid */
+  .dot-grid {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image: radial-gradient(rgba(245,158,11,0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  /* ===== MAIN CONTAINER ===== */
+  .game-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 480px;
+    padding: 0 20px;
+  }
+
+  /* ===== TITLE ===== */
+  .game-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(36px, 8vw, 52px);
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+
+  .game-title .accent { color: var(--accent); }
+
+  .game-subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 400;
+    margin-bottom: 32px;
+  }
+
+  /* ===== GAME CARD ===== */
+  .game-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    margin-bottom: 20px;
+    transition: border-color 0.3s;
+  }
+
+  /* ===== NUMBER RANGE VISUALIZER =====
+     A horizontal bar showing the narrowed range */
+  .range-bar-wrap {
+    margin-bottom: 24px;
+  }
+
+  .range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .range-bar {
+    position: relative;
+    height: 8px;
+    background: var(--bg-subtle);
+    border-radius: 4px;
+    overflow: visible;
+  }
+
+  .range-fill {
+    position: absolute;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-light));
+    border-radius: 4px;
+    transition: left 0.4s ease, width 0.4s ease;
+  }
+
+  .range-marker {
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--fg);
+    border: 3px solid var(--accent);
+    transform: translate(-50%, -50%);
+    transition: left 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 2;
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  /* ===== STATS ROW ===== */
+  .stats-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .stat-box {
+    flex: 1;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.danger { color: var(--danger); }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 500;
+  }
+
+  /* ===== INPUT GROUP ===== */
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .guess-input {
+    flex: 1;
+    padding: 14px 18px;
+    background: var(--bg-subtle);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    font-size: 18px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  .guess-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-dim);
+  }
+
+  .guess-input::placeholder {
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 15px;
+    letter-spacing: 0;
+  }
+
+  /* Hide the number input spinners */
+  .guess-input::-webkit-inner-spin-button,
+  .guess-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .guess-input[type=number] { -moz-appearance: textfield; }
+
+  .guess-btn {
+    padding: 14px 24px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .guess-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px var(--accent-glow);
+  }
+
+  .guess-btn:active { transform: translateY(0); }
+
+  .guess-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ===== FEEDBACK MESSAGE ===== */
+  .feedback {
+    text-align: center;
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-weight: 600;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.3s;
+    margin-bottom: 4px;
+  }
+
+  .feedback.idle {
+    background: var(--bg-subtle);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .feedback.too-high {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(239,68,68,0.2);
+    animation: feedbackPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .feedback.too-low {
+    background: var(--info-dim);
+    color: var(--info);
+    border: 1px solid rgba(56,189,248,0.2);
+    animation: feedbackPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .feedback.correct {
+    background: var(--success-dim);
+    color: var(--success);
+    border: 1px solid rgba(34,197,94,0.2);
+    animation: feedbackPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .feedback.very-close {
+    background: var(--accent-dim);
+    color: var(--accent-light);
+    border: 1px solid rgba(245,158,11,0.2);
+    animation: feedbackPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .feedback.game-over {
+    background: var(--danger-dim);
+    color: var(--danger);
+    border: 1px solid rgba(239,68,68,0.2);
+    animation: feedbackPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes feedbackPop {
+    0% { transform: scale(0.92); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .feedback .hint-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 100px;
+    background: rgba(245,158,11,0.2);
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* ===== GUESS HISTORY ===== */
+  .history-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+
+  .history-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .history-title i { color: var(--accent); font-size: 12px; }
+
+  .history-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 38px;
+    align-items: center;
+  }
+
+  .history-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    animation: chipIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes chipIn {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .history-chip.high {
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+
+  .history-chip.low {
+    background: var(--info-dim);
+    color: var(--info);
+  }
+
+  .history-chip.correct {
+    background: var(--success-dim);
+    color: var(--success);
+  }
+
+  .history-chip i { font-size: 10px; }
+
+  .history-empty {
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* ===== RESTART BUTTON ===== */
+  .restart-btn {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .restart-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  /* ===== WIN CELEBRATION OVERLAY ===== */
+  .win-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(12,10,9,0.85);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .win-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .win-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px 36px;
+    text-align: center;
+    max-width: 380px;
+    width: 90%;
+    transform: scale(0.8) translateY(30px);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .win-overlay.show .win-card {
+    transform: scale(1) translateY(0);
+  }
+
+  .win-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: var(--success-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--success);
+    margin: 0 auto 20px;
+  }
+
+  .win-number {
+    font-family: 'Outfit', sans-serif;
+    font-size: 64px;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .win-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--fg);
+    margin-bottom: 6px;
+  }
+
+  .win-detail {
+    font-size: 14px;
+    color: var(--fg-dim);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .win-btn {
+    padding: 14px 32px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 100px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .win-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--accent-glow);
+  }
+
+  /* ===== CONFETTI PARTICLES ===== */
+  .confetti-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 101;
+    pointer-events: none;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 500px) {
+    .game-card { padding: 22px 18px; }
+    .history-card { padding: 16px 18px; }
+    .stats-row { gap: 8px; }
+    .stat-box { padding: 10px 8px; }
+    .stat-value { font-size: 22px; }
+    .input-group { flex-direction: column; }
+    .guess-btn { justify-content: center; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- Animated background layer -->
+<div class="bg-layer">
+  <div class="orb"></div>
+  <div class="orb"></div>
+  <div class="orb"></div>
+</div>
+<div class="dot-grid"></div>
+
+<!-- Main game UI -->
+<div class="game-container">
+
+  <!-- Title -->
+  <h1 class="game-title">Guess the <span class="accent">Number</span></h1>
+  <p class="game-subtitle">I'm thinking of a number between 1 and 100. You have 10 tries.</p>
+
+  <!-- Game card -->
+  <div class="game-card" id="gameCard">
+
+    <!-- Range visualizer bar -->
+    <div class="range-bar-wrap">
+      <div class="range-labels">
+        <span id="rangeLow">1</span>
+        <span id="rangeHigh">100</span>
+      </div>
+      <div class="range-bar">
+        <div class="range-fill" id="rangeFill" style="left:0%;width:100%;"></div>
+        <div class="range-marker" id="rangeMarker" style="left:50%;opacity:0;"></div>
+      </div>
+    </div>
+
+    <!-- Stats: attempts remaining & guess count -->
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-value accent" id="attemptsLeft">10</div>
+        <div class="stat-label">Tries Left</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="guessCount">0</div>
+        <div class="stat-label">Guesses</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="bestScore" style="color:var(--success);">—</div>
+        <div class="stat-label">Best</div>
+      </div>
+    </div>
+
+    <!-- Input + submit button -->
+    <div class="input-group">
+      <input
+        type="number"
+        class="guess-input"
+        id="guessInput"
+        placeholder="Enter 1 – 100"
+        min="1"
+        max="100"
+        aria-label="Your guess"
+      >
+      <button class="guess-btn" id="guessBtn" onclick="makeGuess()">
+        <i class="fas fa-arrow-right"></i> Guess
+      </button>
+    </div>
+
+    <!-- Feedback area -->
+    <div class="feedback idle" id="feedback">
+      <i class="fas fa-question-circle"></i>
+      Pick a number and go!
+    </div>
+  </div>
+
+  <!-- Guess history -->
+  <div class="history-card">
+    <div class="history-title"><i class="fas fa-clock-rotate-left"></i> Guess History</div>
+    <div class="history-list" id="historyList">
+      <span class="history-empty">No guesses yet</span>
+    </div>
+  </div>
+
+  <!-- Restart -->
+  <button class="restart-btn" onclick="restartGame()">
+    <i class="fas fa-rotate-right"></i> New Game
+  </button>
+</div>
+
+<!-- Win overlay (shown on correct guess) -->
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <div class="win-icon"><i class="fas fa-trophy"></i></div>
+    <div class="win-number" id="winNumber">42</div>
+    <div class="win-text" id="winText">You got it!</div>
+    <div class="win-detail" id="winDetail">Took 5 attempts</div>
+    <button class="win-btn" onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<!-- Confetti canvas for win celebration -->
+<canvas class="confetti-canvas" id="confettiCanvas"></canvas>
+
+<script>
+/* ============================================================
+   GUESS THE NUMBER — Game Logic
+   ============================================================
+   - Random number between 1 and 100
+   - 10 attempts max
+   - "Very close!" hint when within ±5
+   - Visual range bar that narrows as you guess
+   - Guess history with color-coded chips
+   - Best score tracking (per session)
+   - Confetti celebration on win
+   ============================================================ */
+
+// --- Game State ---
+let secretNumber = 0;     // The number the player must guess
+let attemptsLeft = 10;    // How many tries remain
+let guessCount = 0;       // How many guesses made so far
+let lowBound = 1;         // Current known lower bound
+let highBound = 100;      // Current known upper bound
+let gameOver = false;     // Is the round over?
+let bestScore = null;     // Best (fewest) guesses this session
+let guessHistory = [];    // Array of { value, result } objects
+
+// --- DOM References ---
+const guessInput    = document.getElementById('guessInput');
+const guessBtn      = document.getElementById('guessBtn');
+const feedbackEl    = document.getElementById('feedback');
+const attemptsEl    = document.getElementById('attemptsLeft');
+const guessCountEl  = document.getElementById('guessCount');
+const bestScoreEl   = document.getElementById('bestScore');
+const historyList   = document.getElementById('historyList');
+const rangeLowEl    = document.getElementById('rangeLow');
+const rangeHighEl   = document.getElementById('rangeHigh');
+const rangeFill     = document.getElementById('rangeFill');
+const rangeMarker   = document.getElementById('rangeMarker');
+const winOverlay    = document.getElementById('winOverlay');
+const winNumber     = document.getElementById('winNumber');
+const winText       = document.getElementById('winText');
+const winDetail     = document.getElementById('winDetail');
+const confettiCanvas = document.getElementById('confettiCanvas');
+
+// --- Initialize a new game ---
+function initGame() {
+  // Pick a random integer from 1 to 100 (inclusive)
+  secretNumber = Math.floor(Math.random() * 100) + 1;
+  attemptsLeft = 10;
+  guessCount = 0;
+  lowBound = 1;
+  highBound = 100;
+  gameOver = false;
+  guessHistory = [];
+
+  // Reset UI
+  attemptsEl.textContent = '10';
+  attemptsEl.className = 'stat-value accent';
+  guessCountEl.textContent = '0';
+  if (bestScore !== null) bestScoreEl.textContent = bestScore;
+  guessInput.value = '';
+  guessInput.disabled = false;
+  guessBtn.disabled = false;
+  guessInput.focus();
+
+  // Reset feedback to idle state
+  feedbackEl.className = 'feedback idle';
+  feedbackEl.innerHTML = '<i class="fas fa-question-circle"></i> Pick a number and go!';
+
+  // Reset range bar
+  updateRangeBar();
+  rangeMarker.style.opacity = '0';
+
+  // Reset history
+  historyList.innerHTML = '<span class="history-empty">No guesses yet</span>';
+
+  // Hide win overlay
+  winOverlay.classList.remove('show');
+}
+
+// --- Handle a guess ---
+function makeGuess() {
+  if (gameOver) return;
+
+  // Get and validate the input
+  const value = parseInt(guessInput.value);
+
+  if (isNaN(value) || value < 1 || value > 100) {
+    // Shake the input briefly for invalid entry
+    guessInput.style.borderColor = 'var(--danger)';
+    guessInput.style.animation = 'none';
+    void guessInput.offsetHeight; // force reflow
+    guessInput.style.animation = '';
+    setFeedback('idle', 'fa-exclamation-circle', 'Please enter a number between 1 and 100');
+    return;
+  }
+
+  // Count this guess
+  guessCount++;
+  attemptsLeft--;
+
+  // Update stat displays
+  attemptsEl.textContent = attemptsLeft;
+  guessCountEl.textContent = guessCount;
+
+  // Color the tries-left red when running low
+  if (attemptsLeft <= 3) {
+    attemptsEl.className = 'stat-value danger';
+  }
+
+  // Calculate how close the guess is (for the "very close" hint)
+  const difference = Math.abs(value - secretNumber);
+  const isVeryClose = difference <= 5 && difference > 0;
+
+  // Determine the result: too high, too low, or correct
+  let result; // 'high', 'low', or 'correct'
+
+  if (value === secretNumber) {
+    result = 'correct';
+  } else if (value > secretNumber) {
+    result = 'high';
+    // Narrow the known range
+    if (value < highBound) highBound = value - 1;
+  } else {
+    result = 'low';
+    if (value > lowBound) lowBound = value + 1;
+  }
+
+  // Save to history
+  guessHistory.push({ value, result });
+
+  // Update the range visualizer
+  updateRangeBar();
+  placeMarker(value);
+
+  // Add a colored chip to the history
+  addHistoryChip(value, result);
+
+  // Clear input for next guess
+  guessInput.value = '';
+
+  // --- Show appropriate feedback ---
+  if (result === 'correct') {
+    handleWin();
+  } else if (attemptsLeft === 0) {
+    handleLoss();
+  } else if (isVeryClose) {
+    // "Very close!" hint when within ±5
+    const direction = result === 'high' ? 'but a bit high' : 'but a bit low';
+    setFeedback('very-close', 'fa-fire', `${value}? So close! ${direction}`, 'Very close!');
+  } else if (result === 'high') {
+    setFeedback('too-high', 'fa-arrow-down', `${value} is too high!`);
+  } else {
+    setFeedback('too-low', 'fa-arrow-up', `${value} is too low!`);
+  }
+
+  // Keep focus on the input for quick consecutive guesses
+  if (!gameOver) guessInput.focus();
+}
+
+// --- Handle a correct guess ---
+function handleWin() {
+  gameOver = true;
+  guessInput.disabled = true;
+  guessBtn.disabled = true;
+
+  setFeedback('correct', 'fa-check-circle', 'Correct! You found it!');
+
+  // Track best score
+  if (bestScore === null || guessCount < bestScore) {
+    bestScore = guessCount;
+    bestScoreEl.textContent = bestScore;
+  }
+
+  // Show win overlay after a short delay
+  setTimeout(() => {
+    winNumber.textContent = secretNumber;
+
+    // Personalized message based on performance
+    let message;
+    if (guessCount <= 3) message = 'Incredible intuition!';
+    else if (guessCount <= 5) message = 'Sharp guessing!';
+    else if (guessCount <= 7) message = 'Well played!';
+    else message = 'Got there in the end!';
+
+    winText.textContent = message;
+    winDetail.textContent = `You found ${secretNumber} in ${guessCount} attempt${guessCount > 1 ? 's' : ''}`;
+
+    winOverlay.classList.add('show');
+    launchConfetti();
+  }, 600);
+}
+
+// --- Handle running out of attempts ---
+function handleLoss() {
+  gameOver = true;
+  guessInput.disabled = true;
+  guessBtn.disabled = true;
+
+  setFeedback('game-over', 'fa-skull-crossbones',
+    `Out of tries! The number was ${secretNumber}.`);
+
+  // Reveal the correct number on the range bar
+  setTimeout(() => placeMarker(secretNumber), 300);
+}
+
+// --- Update the feedback display ---
+function setFeedback(type, icon, text, tag) {
+  feedbackEl.className = `feedback ${type}`;
+  let html = `<i class="fas ${icon}"></i> ${text}`;
+  if (tag) html += ` <span class="hint-tag">${tag}</span>`;
+  feedbackEl.innerHTML = html;
+}
+
+// --- Update the range bar (narrows as bounds tighten) ---
+function updateRangeBar() {
+  rangeLowEl.textContent = lowBound;
+  rangeHighEl.textContent = highBound;
+
+  const leftPct  = ((lowBound - 1) / 99) * 100;
+  const rightPct = ((highBound - 1) / 99) * 100;
+
+  rangeFill.style.left  = leftPct + '%';
+  rangeFill.style.width = (rightPct - leftPct) + '%';
+}
+
+// --- Place the marker dot at a specific number's position ---
+function placeMarker(num) {
+  const pct = ((num - 1) / 99) * 100;
+  rangeMarker.style.left = pct + '%';
+  rangeMarker.style.opacity = '1';
+}
+
+// --- Add a color-coded chip to the guess history ---
+function addHistoryChip(value, result) {
+  // Remove the "no guesses yet" placeholder
+  const empty = historyList.querySelector('.history-empty');
+  if (empty) empty.remove();
+
+  const chip = document.createElement('span');
+  chip.className = `history-chip ${result}`;
+
+  // Choose icon based on result
+  const icons = { high: 'fa-caret-down', low: 'fa-caret-up', correct: 'fa-check' };
+  chip.innerHTML = `${value} <i class="fas ${icons[result]}"></i>`;
+
+  historyList.appendChild(chip);
+
+  // Auto-scroll the history to the newest chip
+  historyList.scrollLeft = historyList.scrollWidth;
+}
+
+// --- Restart the game ---
+function restartGame() {
+  initGame();
+}
+
+// --- Enter key submits the guess ---
+guessInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    makeGuess();
+  }
+});
+
+// --- Reset input border color on focus (after invalid shake) ---
+guessInput.addEventListener('focus', () => {
+  guessInput.style.borderColor = '';
+});
+
+
+/* ============================================================
+   CONFETTI CELEBRATION
+   Simple canvas-based confetti particles for the win screen
+   ============================================================ */
+const confettiCtx = confettiCanvas.getContext('2d');
+let confettiParticles = [];
+let confettiAnimId = null;
+
+function resizeConfetti() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+// Confetti color palette (warm, matching the theme)
+const confettiColors = [
+  '#f59e0b', '#fbbf24', '#f97316', '#22c55e',
+  '#ef4444', '#fafaf9', '#a78bfa', '#38bdf8'
+];
+
+function launchConfetti() {
+  confettiParticles = [];
+
+  // Create 120 particles from the center-top
+  for (let i = 0; i < 120; i++) {
+    confettiParticles.push({
+      x: confettiCanvas.width / 2 + (Math.random() - 0.5) * 200,
+      y: confettiCanvas.height * 0.35,
+      vx: (Math.random() - 0.5) * 14,
+      vy: -(Math.random() * 12 + 4),
+      w: Math.random() * 8 + 4,
+      h: Math.random() * 6 + 3,
+      color: confettiColors[Math.floor(Math.random() * confettiColors.length)],
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 12,
+      gravity: 0.18 + Math.random() * 0.08,
+      opacity: 1,
+      decay: 0.005 + Math.random() * 0.005
+    });
+  }
+
+  if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
+  animateConfetti();
+}
+
+function animateConfetti() {
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+  let alive = false;
+
+  for (const p of confettiParticles) {
+    if (p.opacity <= 0) continue;
+    alive = true;
+
+    // Physics
+    p.vy += p.gravity;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.99;
+    p.rotation += p.rotSpeed;
+    p.opacity -= p.decay;
+
+    // Draw
+    confettiCtx.save();
+    confettiCtx.translate(p.x, p.y);
+    confettiCtx.rotate((p.rotation * Math.PI) / 180);
+    confettiCtx.globalAlpha = Math.max(0, p.opacity);
+    confettiCtx.fillStyle = p.color;
+    confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    confettiCtx.restore();
+  }
+
+  if (alive) {
+    confettiAnimId = requestAnimationFrame(animateConfetti);
+  } else {
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    confettiAnimId = null;
+  }
+}
+
+// --- Start the first game on page load ---
+initGame();
+</script>
+</body>
+</html>
